@@ -75,7 +75,7 @@ def sessionPage(browser, url):
     browser.get(url)
 
     session_id = uuid.uuid4()
-    # extractAndWriteSessionDetailsData(browser, session_id)
+    extractAndWriteSessionDetailsData(browser, session_id)
     # extractAndWriteLapsData
     extractAndWriteSessionInfo(browser, url, session_id)
 
@@ -180,7 +180,6 @@ def extractAndWriteSessionDetailsData(browser, session_id):
 
         session = session_overview[1].text
 
-        # Session details part
         if session == "Qualify":
             for row in session_details:
                 items = row.find_elements(By.TAG_NAME, "td")
@@ -190,8 +189,8 @@ def extractAndWriteSessionDetailsData(browser, session_id):
                 fastest_lap = items[3].text
                 gap_to_first = items[4].text
 
-                cursor.execute("INSERT INTO laps "
-                               "(session_id, position, driver, car, fastest_lap, gap_to_first)"
+                cursor.execute("INSERT INTO sessions_details "
+                               "(session_id, rank, driver, car, fastest_lap, gap_to_first)"
                                "VALUES (%s, %s, %s, %s, %s, %s)",
                                (session_id, position, driver, car, fastest_lap, gap_to_first))
 
@@ -205,8 +204,8 @@ def extractAndWriteSessionDetailsData(browser, session_id):
                 gap_to_first = items[4].text
                 fastest_lap = items[5].text
 
-                cursor.execute("INSERT INTO laps "
-                               "(session_id, position, driver, car, fastest_lap, gap_to_first, total_time)"
+                cursor.execute("INSERT INTO sessions_details "
+                               "(session_id, rank, driver, car, fastest_lap, gap_to_first, total_time)"
                                "VALUES (%s, %s, %s, %s, %s, %s, %s)",
                                (session_id, position, driver, car, fastest_lap, gap_to_first, total_time))
 
