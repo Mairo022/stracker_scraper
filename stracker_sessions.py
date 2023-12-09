@@ -1,5 +1,6 @@
 import os
 import uuid
+import random
 import psycopg2
 from time import sleep
 from psycopg2 import extras
@@ -12,6 +13,9 @@ from selenium.webdriver.support import expected_conditions as EC
 
 BASE_URL = ""
 SESSIONS_URL = f"{BASE_URL}/sessionstat"
+
+SLEEP_MIN = 0.5
+SLEEP_MAX = 5
 
 load_dotenv()
 
@@ -65,7 +69,7 @@ def sessionsPage(browser):
 
     for session_link in sessions_links:
         sessionPage(browser, f"{BASE_URL}/{session_link}")
-        sleep(1)
+        sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
 
     browser.execute_script("window.history.go(-1)")
 
@@ -79,7 +83,7 @@ def sessionPage(browser, url):
     extractAndWriteSessionDetailsData(browser, session_id)
     extractAndWriteLapsData(browser, url, session_id)
 
-    sleep(1)
+    sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
     browser.execute_script("window.history.go(-1)")
 
 
@@ -249,7 +253,7 @@ def extractAndWriteLapsData(browser, url, session_id):
         for driver_link in driver_links:
             # Leads to /sessiondetails?playerInSessionId=
             browser.get(f"{BASE_URL}/{driver_link}")
-            sleep(1)
+            sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
 
             laps = WebDriverWait(browser, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "tbody > tr")))
 
@@ -259,7 +263,8 @@ def extractAndWriteLapsData(browser, url, session_id):
                 lap_dict = {}
                 # Leads to /lapdetails?lapid=
                 browser.get(f"{BASE_URL}/{session_link}")
-                sleep(1)
+                sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
+
                 lap_info = (WebDriverWait(browser, 10)
                             .until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".col-md-3:nth-of-type(2) table tr"))))
 
