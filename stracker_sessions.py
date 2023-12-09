@@ -75,9 +75,9 @@ def sessionPage(browser, url):
     browser.get(url)
 
     session_id = uuid.uuid4()
-    extractAndWriteSessionDetailsData(browser, session_id)
-    # extractAndWriteLapsData
     extractAndWriteSessionInfo(browser, url, session_id)
+    extractAndWriteSessionDetailsData(browser, session_id)
+    extractAndWriteLapsData(browser, url, session_id)
 
     sleep(1)
     browser.execute_script("window.history.go(-1)")
@@ -214,6 +214,129 @@ def extractAndWriteSessionDetailsData(browser, session_id):
     finally:
         connection.close()
         cursor.close()
+
+
+# /sessiondetails?sessionid=
+def extractAndWriteLapsData(browser, url, session_id):
+    connection, cursor = db()
+
+    try:
+        lap_keys = [
+            "Name",
+            "Track",
+            "Car"
+            "Lap time",
+            "Achieved on",
+            "Valid",
+            "Cuts",
+            "Maximum Speed",
+            "Pit Lane Time",
+            "Pit Time",
+            "Tyres used",
+            "Grip level",
+            "Car collisions",
+            "Env collisions",
+            "Sector 1",
+            "Sector 2",
+            "Sector 3"
+        ]
+
+        tables = WebDriverWait(browser, 10).until(EC.presence_of_all_elements_located((By.TAG_NAME, "tbody")))
+        session_details = tables[1].find_elements(By.TAG_NAME, "tr")
+
+        driver_links = [driver.get_attribute("href") for driver in session_details]
+
+        for driver_link in driver_links:
+            # Leads to /sessiondetails?playerInSessionId=
+            browser.get(f"{BASE_URL}/{driver_link}")
+            sleep(1)
+
+            laps = WebDriverWait(browser, 10).until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, "tbody > tr")))
+
+            laps_links = [lap.get_attribute("href") for lap in laps]
+
+            for session_link in laps_links:
+                lap_dict = {}
+                # Leads to /lapdetails?lapid=
+                browser.get(f"{BASE_URL}/{session_link}")
+                sleep(1)
+                lap_info = (WebDriverWait(browser, 10)
+                            .until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".col-md-3:nth-of-type(2) table tr"))))
+
+                driver_info = (WebDriverWait(browser, 10)
+                               .until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".col-md-3:nth-of-type(1) table tr"))))
+
+                # Driver information table
+                for row in driver_info:
+                    key, value = row.find_elements(By.TAG_NAME, "td")
+
+                    if key.text == "Car":
+                        model = value.text
+                        brand = row.find_element(By.TAG_NAME, "img").get_property("title")
+                        car = f"{brand} {model}"
+
+                        lap_dict["Car"] = car
+                        break
+
+                    if key.text in lap_keys:
+                        lap_dict[key.text] = value.text
+
+                # Lap information table
+                for row in lap_info:
+                    key, value = row.find_elements(By.TAG_NAME, "td")
+
+                    if key.text in lap_keys:
+                        lap_dict[key.text] = value.text
+
+                # Adjust lap values
+                num_keys_to_adjust = ["Maximum Speed", "Grip level", "Sector 1", "Sector 2", "Sector 3"]
+                for key in num_keys_to_adjust:
+                    try:
+                        lap_dict[key] = lap_dict.get(key).split(" ")[0]
+                    except KeyError:
+                        lap_dict[key] = 0
+
+                lap_dict["Valid"] = True if lap_dict.get("Valid") == "yes" else False
+                lap_dict["Date and time"] = datetime.strptime(lap_dict.get("Achieved on"), "%Y-%m-%d %H:%M")
+
+                cursor.execute(
+                    "INSERT INTO laps "
+                    "("
+                    "session_id, driver, car, track, laptime, s1, s2, s3, valid, cuts, crashes_env, "
+                    "crashes_cars, pit_time, pitlane_time, grip, maximum_speed, date"
+                    ")"
+                    "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (
+                        session_id,
+                        lap_dict.get("Driver"),
+                        lap_dict.get("Car"),
+                        lap_dict.get("Track"),
+                        lap_dict.get("Lap time"),
+                        lap_dict.get("Sector 1"),
+                        lap_dict.get("Sector 2"),
+                        lap_dict.get("Sector 3"),
+                        lap_dict.get("Valid"),
+                        int(lap_dict.get("Cuts")),
+                        int(lap_dict.get("Env collisions")),
+                        int(lap_dict.get("Car collisions")),
+                        lap_dict.get("Pit Time"),
+                        lap_dict.get("Pit Lane Time"),
+                        int(lap_dict.get("Grip level")),
+                        float(lap_dict.get("Maximum Speed")),
+                        lap_dict.get("Achieved on"),
+                    ))
+
+                connection.commit()
+
+    except psycopg2.Error:
+        connection.rollback()
+
+    except Exception as e:
+        print(e)
+
+    finally:
+        connection.close()
+        cursor.close()
+        browser.get(url)
 
 
 main()
