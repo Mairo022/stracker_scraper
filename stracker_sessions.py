@@ -19,6 +19,7 @@ SLEEP_MAX = 5
 
 load_dotenv()
 
+
 def main():
     options = webdriver.ChromeOptions()
     options.binary_location = '/usr/bin/brave-browser'
@@ -45,52 +46,68 @@ def db():
 
 
 def handleSessions(browser):
-    browser.get(SESSIONS_URL)
+    connection, cursor = db()
 
-    for page_current in range(0, 50):
-        sessionsPage(browser)
-        browser.get(SESSIONS_URL + '?page=' + str(page_current + 1))
+    try:
+        browser.get(SESSIONS_URL)
 
-        pagination = (WebDriverWait(browser, 10)
-                      .until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".pagination > li"))))
+        for page_current in range(0, 50):
+            sessionsPage(browser, connection, cursor)
 
-        page_last = int(pagination[-3].text)
+            browser.get(SESSIONS_URL + '?page=' + str(page_current + 1))
 
-        if page_current + 1 == page_last:
-            break
+            pagination = (WebDriverWait(browser, 10)
+                          .until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, ".pagination > li"))))
+
+            page_last = int(pagination[-3].text)
+
+            if page_current + 1 == page_last:
+                break
+
+    except Exception as e:
+        print(e)
+
+    finally:
+        cursor.close()
+        connection.close()
 
 
 # /sessionstat
-def sessionsPage(browser):
-    sessions = (WebDriverWait(browser, 10)
-                .until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'tbody > tr'))))
+def sessionsPage(browser, connection, cursor):
+    try:
+        sessions = (WebDriverWait(browser, 10)
+                    .until(EC.presence_of_all_elements_located((By.CSS_SELECTOR, 'tbody > tr'))))
 
-    sessions_links = [session.get_attribute("href") for session in sessions]
+        sessions_links = [session.get_attribute("href") for session in sessions]
 
-    for session_link in sessions_links:
-        sessionPage(browser, f"{BASE_URL}/{session_link}")
-        sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
+        for session_link in sessions_links:
+            sessionPage(browser, f"{BASE_URL}/{session_link}", cursor)
+            sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
+            connection.commit()
 
-    browser.execute_script("window.history.go(-1)")
+    except psycopg2.Error as e:
+        print(e)
+        connection.rollback()
+
+    finally:
+        browser.execute_script("window.history.go(-1)")
 
 
-def sessionPage(browser, url):
+def sessionPage(browser, url, cursor):
     # Leads to /sessiondetails?sessionid
     browser.get(url)
-
     session_id = uuid.uuid4()
-    extractAndWriteSessionInfo(browser, url, session_id)
-    extractAndWriteSessionDetailsData(browser, session_id)
-    extractAndWriteLapsData(browser, url, session_id)
+
+    extractAndWriteSessionInfo(browser, url, session_id, cursor)
+    extractAndWriteSessionDetailsData(browser, session_id, cursor)
+    extractAndWriteLapsData(browser, url, session_id, cursor)
 
     sleep(random.uniform(SLEEP_MIN, SLEEP_MAX))
     browser.execute_script("window.history.go(-1)")
 
 
 # /sessiondetails?sessionid=
-def extractAndWriteSessionInfo(browser, url, session_id):
-    connection, cursor = db()
-
+def extractAndWriteSessionInfo(browser, url, session_id, cursor):
     try:
         session_dict = {}
         session_info_keys = [
@@ -165,65 +182,50 @@ def extractAndWriteSessionInfo(browser, url, session_id):
                 session_dict.get("Server name")
             ))
 
-        connection.commit()
-
     finally:
-        connection.close()
-        cursor.close()
         browser.get(url)
 
 
 # /sessiondetails?sessionid=
-def extractAndWriteSessionDetailsData(browser, session_id):
-    connection, cursor = db()
+def extractAndWriteSessionDetailsData(browser, session_id, cursor):
+    tables = WebDriverWait(browser, 10).until(EC.presence_of_all_elements_located((By.TAG_NAME, "tbody")))
+    session_overview = tables[0].find_elements(By.TAG_NAME, "td")
+    session_details = tables[1].find_elements(By.TAG_NAME, "tr")
 
-    try:
-        tables = WebDriverWait(browser, 10).until(EC.presence_of_all_elements_located((By.TAG_NAME, "tbody")))
-        session_overview = tables[0].find_elements(By.TAG_NAME, "td")
-        session_details = tables[1].find_elements(By.TAG_NAME, "tr")
+    session = session_overview[1].text
 
-        session = session_overview[1].text
+    if session == "Qualify":
+        for row in session_details:
+            items = row.find_elements(By.TAG_NAME, "td")
+            position = items[0].text
+            driver = items[1].text
+            car = items[2].text
+            fastest_lap = items[3].text
+            gap_to_first = items[4].text
 
-        if session == "Qualify":
-            for row in session_details:
-                items = row.find_elements(By.TAG_NAME, "td")
-                position = items[0].text
-                driver = items[1].text
-                car = items[2].text
-                fastest_lap = items[3].text
-                gap_to_first = items[4].text
+            cursor.execute("INSERT INTO sessions_details "
+                           "(session_id, rank, driver, car, fastest_lap, gap_to_first)"
+                           "VALUES (%s, %s, %s, %s, %s, %s)",
+                           (session_id, position, driver, car, fastest_lap, gap_to_first))
 
-                cursor.execute("INSERT INTO sessions_details "
-                               "(session_id, rank, driver, car, fastest_lap, gap_to_first)"
-                               "VALUES (%s, %s, %s, %s, %s, %s)",
-                               (session_id, position, driver, car, fastest_lap, gap_to_first))
+    if session == "Race":
+        for row in session_details:
+            items = row.find_elements(By.TAG_NAME, "td")
+            position = items[0].text
+            driver = items[1].text
+            car = items[2].text
+            total_time = items[3].text
+            gap_to_first = items[4].text
+            fastest_lap = items[5].text
 
-        if session == "Race":
-            for row in session_details:
-                items = row.find_elements(By.TAG_NAME, "td")
-                position = items[0].text
-                driver = items[1].text
-                car = items[2].text
-                total_time = items[3].text
-                gap_to_first = items[4].text
-                fastest_lap = items[5].text
-
-                cursor.execute("INSERT INTO sessions_details "
-                               "(session_id, rank, driver, car, fastest_lap, gap_to_first, total_time)"
-                               "VALUES (%s, %s, %s, %s, %s, %s, %s)",
-                               (session_id, position, driver, car, fastest_lap, gap_to_first, total_time))
-
-        connection.commit()
-
-    finally:
-        connection.close()
-        cursor.close()
+            cursor.execute("INSERT INTO sessions_details "
+                           "(session_id, rank, driver, car, fastest_lap, gap_to_first, total_time)"
+                           "VALUES (%s, %s, %s, %s, %s, %s, %s)",
+                           (session_id, position, driver, car, fastest_lap, gap_to_first, total_time))
 
 
 # /sessiondetails?sessionid=
-def extractAndWriteLapsData(browser, url, session_id):
-    connection, cursor = db()
-
+def extractAndWriteLapsData(browser, url, session_id, cursor):
     try:
         lap_keys = [
             "Name",
@@ -330,18 +332,7 @@ def extractAndWriteLapsData(browser, url, session_id):
                         lap_dict.get("Achieved on"),
                     ))
 
-                connection.commit()
-
-    except psycopg2.Error as e:
-        print(e)
-        connection.rollback()
-
-    except Exception as e:
-        print(e)
-
     finally:
-        connection.close()
-        cursor.close()
         browser.get(url)
 
 
