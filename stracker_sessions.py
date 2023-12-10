@@ -299,7 +299,8 @@ def extractAndWriteLapsData(browser, url, session_id, cursor):
                 num_keys_to_adjust = ["Maximum Speed", "Grip level", "Sector 1", "Sector 2", "Sector 3"]
                 for key in num_keys_to_adjust:
                     try:
-                        lap_dict[key] = lap_dict.get(key).split(" ")[0]
+                        value = lap_dict.get(key)
+                        lap_dict[key] = value.split(" ")[0] if value is not None else 0
                     except KeyError:
                         lap_dict[key] = 0
 
