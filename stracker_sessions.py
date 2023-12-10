@@ -228,7 +228,7 @@ def extractAndWriteLapsData(browser, url, session_id):
         lap_keys = [
             "Name",
             "Track",
-            "Car"
+            "Car",
             "Lap time",
             "Achieved on",
             "Valid",
@@ -312,7 +312,7 @@ def extractAndWriteLapsData(browser, url, session_id):
                     ")"
                     "VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)", (
                         session_id,
-                        lap_dict.get("Driver"),
+                        lap_dict.get("Name"),
                         lap_dict.get("Car"),
                         lap_dict.get("Track"),
                         lap_dict.get("Lap time"),
@@ -325,14 +325,15 @@ def extractAndWriteLapsData(browser, url, session_id):
                         int(lap_dict.get("Car collisions")),
                         lap_dict.get("Pit Time"),
                         lap_dict.get("Pit Lane Time"),
-                        int(lap_dict.get("Grip level")),
+                        int(float(lap_dict.get("Grip level"))),
                         float(lap_dict.get("Maximum Speed")),
                         lap_dict.get("Achieved on"),
                     ))
 
                 connection.commit()
 
-    except psycopg2.Error:
+    except psycopg2.Error as e:
+        print(e)
         connection.rollback()
 
     except Exception as e:
