@@ -164,6 +164,13 @@ def extractAndWriteSessionInfo(browser, url, session_id, cursor):
         session_dict["Penalties"] = True if session_dict.get("Penalties") == "yes" else False
         session_dict["Date and time"] = datetime.strptime(session_dict.get("Date and time"), "%Y-%m-%d %H:%M")
 
+        # Example values (session_dict)
+        # {'Track': 'Barcelona - GP', 'Session': 'Qualify', 'Duration': '00:08',
+        # 'Date and time': datetime.datetime( 2024, 1, 12, 12, 15), 'Penalties': True,
+        # 'Tyre wear factor': '1.0', 'Fuel rate': '1.0', 'Mechanical
+        # damage': '60', 'Ambient temperature': '22', 'Track temperature': '29',
+        # 'Server name': 'server00'}
+
         cursor.execute(
             "INSERT INTO sessions "
             "(id, type, date, fuel_rate, tyre_wear_rate, air_temp, road_temp, track, penalties, damage, duration, server) "
@@ -199,7 +206,7 @@ def extractAndWriteSessionDetailsData(browser, session_id, cursor):
             items = row.find_elements(By.TAG_NAME, "td")
             position = items[0].text
             driver = items[1].text
-            car = items[2].text
+            car = items[2].find_element(By.TAG_NAME, "img").get_property("title") + " " + items[2].text
             fastest_lap = items[3].text
             gap_to_first = items[4].text
 
@@ -213,10 +220,15 @@ def extractAndWriteSessionDetailsData(browser, session_id, cursor):
             items = row.find_elements(By.TAG_NAME, "td")
             position = items[0].text
             driver = items[1].text
-            car = items[2].text
-            total_time = items[3].text
+            car = items[2].find_element(By.TAG_NAME, "img").get_property("title") + " " + items[2].text
+            total_time = items[3].text if items[3].text != "--.--.---" else None
             gap_to_first = items[4].text
             fastest_lap = items[5].text
+
+            # Example values
+            # session_id: 0e820083-9999-41b0-bb8d-cb0d5deff29b, rank: 1,
+            # driver: Lucas, car: Mazda MX5 Cup, gap_to_first: +02.800,
+            # fastest_lap: 02:10.987, total_time: 11:20:44
 
             cursor.execute("INSERT INTO sessions_details "
                            "(session_id, rank, driver, car, fastest_lap, gap_to_first, total_time)"
@@ -306,6 +318,13 @@ def extractAndWriteLapsData(browser, url, session_id, cursor):
 
                 lap_dict["Valid"] = True if lap_dict.get("Valid") == "yes" else False
                 lap_dict["Date and time"] = datetime.strptime(lap_dict.get("Achieved on"), "%Y-%m-%d %H:%M")
+
+                # Example values (lap_dict)
+                # {'Name': 'Lucas', 'Track': 'Barcelona - GP', 'Car': 'Mazda MX5 Cup', 'Lap time': '02:23.866',
+                # 'Achieved on': '2024-01-12 12:18', 'Valid': False, 'Cuts': '2', 'Maximum Speed': '170',
+                # 'Pit Lane Time': '-', 'Pit Time': '-', 'Tyres used': 'unknown', 'Grip level': '100.0',
+                # 'Car collisions': '0', 'Env collisions': '0', 'Sector 1': 0, 'Sector 2': 0, 'Sector 3': 0,
+                # 'Date and time': datetime.datetime(2024, 1, 12, 12, 18)}
 
                 cursor.execute(
                     "INSERT INTO laps "
