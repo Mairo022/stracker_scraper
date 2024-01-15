@@ -7,6 +7,7 @@ from psycopg2 import extras
 from datetime import datetime
 from dotenv import load_dotenv
 from selenium import webdriver
+from selenium.common import NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -206,7 +207,7 @@ def extractAndWriteSessionDetailsData(browser, session_id, cursor):
             items = row.find_elements(By.TAG_NAME, "td")
             position = items[0].text
             driver = items[1].text
-            car = items[2].find_element(By.TAG_NAME, "img").get_property("title") + " " + items[2].text
+            car = getCar(items[2])
             fastest_lap = items[3].text
             gap_to_first = items[4].text
 
@@ -220,7 +221,7 @@ def extractAndWriteSessionDetailsData(browser, session_id, cursor):
             items = row.find_elements(By.TAG_NAME, "td")
             position = items[0].text
             driver = items[1].text
-            car = items[2].find_element(By.TAG_NAME, "img").get_property("title") + " " + items[2].text
+            car = getCar(items[2])
             total_time = items[3].text if items[3].text != "--.--.---" else None
             gap_to_first = items[4].text
             fastest_lap = items[5].text
@@ -290,10 +291,7 @@ def extractAndWriteLapsData(browser, url, session_id, cursor):
                     key, value = row.find_elements(By.TAG_NAME, "td")
 
                     if key.text == "Car":
-                        model = value.text
-                        brand = row.find_element(By.TAG_NAME, "img").get_property("title")
-                        car = f"{brand} {model}"
-
+                        car = getCar(row)
                         lap_dict["Car"] = car
                         break
 
@@ -354,6 +352,13 @@ def extractAndWriteLapsData(browser, url, session_id, cursor):
 
     finally:
         browser.get(url)
+
+
+def getCar(item):
+    try:
+        return item.find_element(By.TAG_NAME, "img").get_property("title") + " " + item.text
+    except NoSuchElementException:
+        return item.text
 
 
 main()
