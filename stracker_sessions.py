@@ -205,7 +205,7 @@ def extractAndWriteSessionDetailsData(browser, session_id, cursor):
     if session == "Qualify":
         for row in session_details:
             items = row.find_elements(By.TAG_NAME, "td")
-            position = items[0].text
+            position = int(items[0].text) if items[0].text is not "DNF" else None
             driver = items[1].text
             car = getCar(items[2])
             fastest_lap = items[3].text
@@ -219,7 +219,7 @@ def extractAndWriteSessionDetailsData(browser, session_id, cursor):
     if session == "Race":
         for row in session_details:
             items = row.find_elements(By.TAG_NAME, "td")
-            position = items[0].text
+            position = int(items[0].text) if items[0].text is not "DNF" else None
             driver = items[1].text
             car = getCar(items[2])
             total_time = items[3].text if items[3].text != "--.--.---" else None
